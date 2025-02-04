@@ -1,0 +1,53 @@
+.App {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding: 2rem 4rem;
+	box-shadow: 0 0 0 1px grey;
+}
+
+h2 {
+	text-align: center;
+	color: #3c3c3c;
+}
+
+p {
+	text-align: center;
+	color: #a1a1a1;
+}
+
+.chapter {
+	break-after: page;
+}
+
+@page {
+	size: 8.5in 11in;
+	margin: 20mm 25mm;
+}
+
+@page: first {
+	@top-center {
+		content: 'START';
+	}
+}
+
+@page {
+	@bottom-center {
+		content: string(title);
+	}
+}
+
+.chapter > h2 {
+	string-set: title content(text);
+}
+
+@page {
+	@right-middle {
+		content: string(ref);
+	}
+}
+.chapter {
+	string-set: ref attr(data-reference);
+}
