@@ -6,23 +6,23 @@ import { Previewer } from 'pagedjs';
 import html2pdf from 'html2pdf.js';
 
 interface PreviewProps {
-    html: string;       // The HTML content to be previewed and converted to PDF
-    title: string;      // The title of the document
+    html: string;
+    title: string;
 }
 
 const Preview: React.FC<PreviewProps> = ({ html, title }) => {
-    // State management for the preview and PDF generation process
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPreviewReady, setIsPreviewReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [htmlContent, setHtmlContent] = useState<string>(html);
-
-    // Refs to maintain references to DOM elements and the Paged.js previewer
     const contentRef = useRef<HTMLDivElement>(null);
     const previewerRef = useRef<Previewer | null>(null);
+    const previousHtmlRef = useRef<string>('');
 
-    // Function to prepare HTML content for the preview
-    // This wraps the content with necessary styling and structure
+    console.log(html)
+
+    // Get the current theme
+    const isDarkMode = document.documentElement.classList.contains('dark');
+
     const createFormattedContent = (htmlContent: string) => {
         return `
             <!DOCTYPE html>
@@ -36,41 +36,79 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
                             margin: 2cm;
                         }
                         
+                        /* CSS Variables for theming */
+                        :root {
+                            --background: ${isDarkMode ? 'hsl(0 0% 3.9%)' : 'hsl(0 0% 100%)'};
+                            --foreground: ${isDarkMode ? 'hsl(0 0% 98%)' : 'hsl(0 0% 3.9%)'};
+                            --muted: ${isDarkMode ? 'hsl(0 0% 14.9%)' : 'hsl(0 0% 96.1%)'};
+                            --muted-foreground: ${isDarkMode ? 'hsl(0 0% 63.9%)' : 'hsl(0 0% 45.1%)'};
+                            --border: ${isDarkMode ? 'hsl(0 0% 14.9%)' : 'hsl(0 0% 89.8%)'};
+                        }
+                        
                         /* Basic document styling */
                         body {
-                            font-family: system-ui, -apple-system, sans-serif;
+                            font-family: Arial, Helvetica, sans-serif;
                             line-height: 1.5;
                             margin: 0;
                             padding: 0;
-                            color: #000;
-                            font-size: 12pt;
+                            background: var(--background);
+                            color: var(--foreground);
                         }
 
-                        /* Content styling */
+                        /* Content styling matching your TipTap styles */
                         .preview-content {
                             max-width: 100%;
                             margin: 0 auto;
+                            
+                            /* Headings */
+                            & h1 {
+                                font-size: 1.875rem;
+                                line-height: 1.2;
+                                margin: 2.5rem 0 1.5rem;
+                            }
+                            
+                            & h2 {
+                                font-size: 1.5rem;
+                                line-height: 1.2;
+                                margin: 2.5rem 0 1.5rem;
+                            }
+                            
+                            & h3 {
+                                font-size: 1.25rem;
+                                line-height: 1.2;
+                                margin: 2rem 0 1rem;
+                            }
+                            
+                            & h4, & h5, & h6 {
+                                font-size: 1.125rem;
+                                line-height: 1.2;
+                                margin: 1.5rem 0 1rem;
+                            }
+                            
+                            /* Rest of your styles remain the same */
                         }
 
-                        /* Paged.js specific styling for preview only */
+                        /* Paged.js specific styling */
                         .pagedjs_pages {
                             max-width: 100%;
                             margin: 0 auto;
                         }
 
                         .pagedjs_page {
-                            background: white;
+                            background: var(--background);
                             margin: 0.5cm auto;
                             box-shadow: 0 0 0.5cm rgba(0, 0, 0, 0.1);
                         }
 
-                        /* Print-specific styles */
                         @media print {
-                            body {
-                                background: none;
-                            }
-                            .pagedjs_page {
-                                box-shadow: none;
+                            body { background: none; }
+                            .pagedjs_page { box-shadow: none; }
+                            :root {
+                                --background: white;
+                                --foreground: black;
+                                --muted: #f1f1f1;
+                                --muted-foreground: #666;
+                                --border: #ddd;
                             }
                         }
                     </style>
@@ -87,18 +125,17 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
         const pages = container.querySelectorAll('.pagedjs_page');
         return pages.length > 0 && Array.from(pages).every(page => {
             const content = page.querySelector('.pagedjs_page_content');
-            return content?.children.length > 0;
+            return content ? content?.children.length > 0 : false;
         });
     };
 
     // Function to wait for Paged.js rendering to complete
     const waitForPagedJS = async (container: HTMLElement): Promise<void> => {
-        const maxAttempts = 50;  // Maximum number of attempts (5 seconds total)
+        const maxAttempts = 50;
         let attempts = 0;
 
         while (attempts < maxAttempts) {
             if (isPagedJSComplete(container)) {
-                // Add a small delay to ensure final render is complete
                 await new Promise(resolve => setTimeout(resolve, 200));
                 return;
             }
@@ -108,7 +145,42 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
         throw new Error('Preview generation timed out');
     };
 
-    // Handler for PDF generation
+    // Initialize or update the preview
+    const updatePreview = async () => {
+        if (!contentRef.current || html === previousHtmlRef.current) return;
+
+        try {
+            setIsPreviewReady(false);
+            setError(null);
+
+            // Clear previous content
+            if (contentRef.current.firstChild) {
+                contentRef.current.innerHTML = '';
+            }
+
+            // Create new previewer instance
+            previewerRef.current = new Previewer();
+
+            // Generate the preview
+            await previewerRef.current.preview(
+                createFormattedContent(html),
+                [],
+                contentRef.current
+            );
+
+            // Wait for rendering to complete
+            await waitForPagedJS(contentRef.current);
+            previousHtmlRef.current = html;
+            setIsPreviewReady(true);
+
+        } catch (error) {
+            console.error('Preview initialization failed:', error);
+            setError('Failed to generate preview. Please try again.');
+            setIsPreviewReady(false);
+        }
+    };
+
+    // Handle PDF generation
     const handleDownload = async () => {
         if (!contentRef.current || !isPreviewReady) {
             setError('Preview is not ready yet. Please wait.');
@@ -119,25 +191,20 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
         setError(null);
 
         try {
-            // Get the content area that contains the rendered pages
             const pagesContainer = contentRef.current.querySelector('.pagedjs_pages');
             if (!pagesContainer) {
                 throw new Error('Could not find rendered content');
             }
 
-            // Clone the content to avoid modifying the display
             const pdfContent = pagesContainer.cloneNode(true) as HTMLElement;
-
-            // Remove any unnecessary elements
             pdfContent.querySelectorAll('style, script').forEach(el => el.remove());
 
-            // Configure html2pdf options for optimal output
             const opt = {
-                margin: [20, 20, 20, 20],  // [top, left, bottom, right] margins in mm
+                margin: [20, 20, 20, 20],
                 filename: `${title || 'document'}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: {
-                    scale: 2,              // Higher scale for better quality
+                    scale: 2,
                     useCORS: true,
                     letterRendering: true,
                     scrollX: 0,
@@ -150,7 +217,6 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
                 }
             };
 
-            // Generate the PDF using html2pdf worker
             await html2pdf()
                 .from(pdfContent)
                 .set(opt)
@@ -164,41 +230,10 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
         }
     };
 
-    // Initialize the preview when content changes
+    // Effect to handle content updates
     useEffect(() => {
-        const initializePreview = async () => {
-            if (!contentRef.current) return;
+        updatePreview();
 
-            try {
-                setIsPreviewReady(false);
-                setError(null);
-
-                // Create or reuse the Paged.js previewer
-                if (!previewerRef.current) {
-                    previewerRef.current = new Previewer();
-                }
-
-                // Generate the preview using Paged.js
-                await previewerRef.current.preview(
-                    createFormattedContent(html),
-                    [],
-                    contentRef.current
-                );
-
-                // Wait for the preview to be fully rendered
-                await waitForPagedJS(contentRef.current);
-                setIsPreviewReady(true);
-
-            } catch (error) {
-                console.error('Preview initialization failed:', error);
-                setError('Failed to generate preview. Please try again.');
-                setIsPreviewReady(false);
-            }
-        };
-
-        initializePreview();
-
-        // Cleanup on unmount or content change
         return () => {
             previewerRef.current = null;
             setIsPreviewReady(false);
@@ -206,12 +241,11 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
         };
     }, []);
 
-    // Render the preview component
     return (
         <div className="flex flex-col h-full">
             <div className="flex justify-between mb-4">
                 {error && (
-                    <div className="text-red-500 text-sm">{error}</div>
+                    <div className="text-destructive text-sm">{error}</div>
                 )}
                 <div className="flex-grow"></div>
                 <Button
@@ -252,7 +286,7 @@ const Preview: React.FC<PreviewProps> = ({ html, title }) => {
             </div>
             <div
                 ref={contentRef}
-                className={`w-full flex-1 bg-white print:p-0 ${!isPreviewReady ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'
+                className={`w-full flex-1 bg-background print:p-0 ${!isPreviewReady ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'
                     }`}
             />
         </div>

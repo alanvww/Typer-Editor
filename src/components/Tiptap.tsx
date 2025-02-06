@@ -147,10 +147,18 @@ const Tiptap = () => {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <Card className="max-w-5xl mx-auto">
+      <Card className="mx-auto">
         {/* Main Toolbar Section */}
         <div className="border-b p-2 flex flex-wrap gap-2 items-center justify-between">
           <div className="flex flex-wrap gap-2 items-center">
+            {/* Document Title Input */}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-8 py-4 text-2xl font-semibold bg-transparent border-none focus:outline-none"
+              placeholder="Document Title"
+            />
             <TooltipProvider>
               {/* Heading Style Selector */}
               <div className="flex items-center gap-1 mr-4">
@@ -390,14 +398,14 @@ const Tiptap = () => {
                 </Button>
               </DialogTrigger>
               <DialogContent
-                className="max-w-4xl h-[90vh] overflow-hidden flex flex-col"
+                className={`max-w-4xl h-[90vh] overflow-hidden flex flex-col`}
                 aria-describedby="preview-description"
               >
                 <DialogHeader>
                   <DialogTitle>{title} - Preview</DialogTitle>
                 </DialogHeader>
                 <div className="flex-1 overflow-auto mt-4">
-                  {editor && showPreview && (
+                  {(editor && showPreview) && (
                     <Preview
                       html={editor.getHTML()}
                       title={title}
@@ -411,18 +419,11 @@ const Tiptap = () => {
 
         {/* Editor Content Section */}
         <CardContent className="p-0">
-          {/* Document Title Input */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-8 py-4 text-2xl font-semibold bg-transparent border-none focus:outline-none"
-            placeholder="Document Title"
-          />
+
 
           {/* TipTap Editor Content */}
-          <div className="px-8 pb-4">
-            <EditorContent editor={editor} />
+          <div className="px-16 py-4 bg-gray-100">
+            <EditorContent editor={editor} className='bg-white p-2' />
           </div>
         </CardContent>
 
